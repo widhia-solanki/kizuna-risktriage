@@ -110,8 +110,9 @@ if len(item_data) > 0:
         fig.add_trace(go.Scatter(x=item_data.index[high_mask], y=item_data['sales'][high_mask], mode='markers',
                                  name='High Risk Day', marker=dict(color='red', size=10, symbol='diamond')))
     fig.update_layout(height=400, xaxis_title='Day', yaxis_title='Demand (units)',
-                      legend=dict(orientation='h', yanchor='bottom', y=1.02), margin=dict(t=30))
-    st.plotly_chart(fig, use_container_width=True)
+                      legend=dict(orientation='h', yanchor='bottom', y=1.02), margin=dict(t=30),
+                      title=f"{selected_item} — last {len(item_data)} days")
+    st.plotly_chart(fig, use_container_width=True, key=f"forecast_{selected_item}_{show_days}")
     latest = item_data.iloc[-1]
     tier_color = {'Low': '🟢', 'Medium': '🟡', 'High': '🔴'}
     tier_action = {'Low': 'Auto-replenish', 'Medium': 'Raise safety stock', 'High': 'ESCALATE: Human review'}
@@ -119,6 +120,16 @@ if len(item_data) > 0:
     with col_a: st.markdown(f"**Risk Tier:** {tier_color[latest['risk_tier']]} {latest['risk_tier']}")
     with col_b: st.markdown(f"**Forecast:** {latest['point_forecast']:.0f} [{latest['lower_bound']:.0f}—{latest['upper_bound']:.0f}]")
     with col_c: st.markdown(f"**Action:** {tier_action[latest['risk_tier']]}")
+
+    # Per-product summary (makes the selection visibly responsive)
+    pcol1, pcol2, pcol3 = st.columns(3)
+    with pcol1:
+        st.metric("Avg Demand (this product)", f"{item_data['sales'].mean():.1f}")
+    with pcol2:
+        st.metric("Avg Interval Width", f"{item_data['interval_width'].mean():.1f}")
+    with pcol3:
+        high_share = 100 * (item_data['risk_tier'] == 'High').mean()
+        st.metric("% High-Risk Days", f"{high_share:.0f}%")
 st.divider()
 
 st.subheader("🚦 Risk Tier Overview")
