@@ -85,15 +85,6 @@ st.title("🎯 Kizuna RiskTriage")
 st.markdown("### Calibrated Uncertainty Quantification for Supply Chain Risk Triage")
 st.caption("Making demand forecasts honest about what they don't know — and actionable for managers.")
 st.divider()
-
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Overall Coverage", f"{metrics['overall_coverage']:.1%}", f"{metrics['overall_coverage']-0.95:+.1%} vs target", help="The % of time actual demand fell within the predicted range.")
-col2.metric("Volatile Coverage", f"{metrics['volatile_coverage']:.1%}", f"{metrics['volatile_coverage']-0.95:+.1%} vs target", help="Coverage calculated only for items with highly variable demand.")
-col3.metric("High Risk Items", f"{100*np.mean(results_df['risk_tier']=='High'):.1f}%", delta="Need attention", help="% of catalog with highly uncertain forecasts requiring review.")
-col4.metric("Mean Interval Width", f"{metrics['mean_width']:.1f} units", help="Average gap between lower and upper bounds. Lower means more precision.")
-st.divider()
-
-
 # ---------------- Sidebar ----------------
 st.sidebar.header("Controls")
 selected_item = st.sidebar.selectbox("Select Product", sorted(results_df['item_id'].unique()))
@@ -108,6 +99,20 @@ st.sidebar.markdown("### Risk Tier Actions")
 st.sidebar.markdown("🟢 **Low** → Auto-replenish")
 st.sidebar.markdown("🟡 **Medium** → Raise safety stock")
 st.sidebar.markdown("🔴 **High** → Human review")
+
+# ---------------- Product-Specific Metrics (Top of Page) ----------------
+item_all = results_df[results_df['item_id'] == selected_item]
+item_cov = item_all['covered'].mean()
+item_width = item_all['interval_width'].mean()
+item_high_risk = (item_all['risk_tier'] == 'High').mean()
+item_sales = item_all['sales'].mean()
+
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Item Coverage", f"{item_cov:.1%}", f"{item_cov-0.95:+.1%} vs target", help="The % of time actual demand fell within the predicted range for this specific item.")
+col2.metric("Avg Demand", f"{item_sales:.1f} units", help="Average daily demand for this item.")
+col3.metric("High-Risk Days", f"{100*item_high_risk:.1f}%", help="% of days this item had highly uncertain forecasts requiring human review.")
+col4.metric("Mean Interval Width", f"{item_width:.1f} units", help="Average gap between lower and upper bounds for this item. Lower means more precision.")
+st.divider()
 
 # ---------------- Per-product forecast (CHANGES per product) ----------------
 item_data = results_df[results_df['item_id'] == selected_item].tail(show_days).reset_index(drop=True)
@@ -143,34 +148,52 @@ if len(item_data) > 0:
     action = {'Low': 'Auto-replenish (nominal safety stock)',
               'Medium': 'Raise safety stock to calibrated quantile; dashboard flag',
               'High': 'ESCALATE: Human review required; consider dual-sourcing'}[tier]
-    badge = {'Low': st.success, 'Medium': st.warning, 'High': st.error}[tier]
-    badge(f"Latest day — Risk Tier: {tier}   |   Forecast: {latest['point_forecast']:.0f} units "
-          f"[{latest['lower_bound']:.0f} – {latest['upper_bound']:.0f}]   |   Action: {action}")
+    
+    tier_icon = {'Low': '🟢', 'Medium': '🟡', 'High': '🔴'}[tier]
+    with st.container(border=True):
+        c1, c2, c3 = st.columns([1, 1, 1.5])
+        c1.metric("Latest Risk Tier", f"{tier_icon} {tier}")
+        c2.metric("Point Forecast", f"{latest['point_forecast']:.0f}", f"{latest['lower_bound']:.0f} to {latest['upper_bound']:.0f} units", delta_color="off")
+        with c3:
+            if tier == 'Low': st.success(f"**Action:** {action}")
+            elif tier == 'Medium': st.warning(f"**Action:** {action}")
+            else: st.error(f"**Action:** {action}")
 
-    pcol1, pcol2, pcol3 = st.columns(3)
-    pcol1.metric("Avg Demand (this product)", f"{item_data['sales'].mean():.1f}")
-    pcol2.metric("Avg Interval Width", f"{item_data['interval_width'].mean():.1f}")
-    pcol3.metric("% High-Risk Days", f"{100*(item_data['risk_tier']=='High').mean():.0f}%")
+
 st.divider()
 
 # ---------------- Portfolio overview (does NOT change per product) ----------------
-st.subheader("🚦 Risk Tier Overview — All Products")
+st.subheader("🚦 Portfolio KPIs — All Products")
+st.caption("System-level metrics summarizing the health of your ENTIRE catalog.")
+
+with st.container(border=True):
+    gcol1, gcol2, gcol3, gcol4 = st.columns(4)
+    gcol1.metric("Overall Coverage", f"{metrics['overall_coverage']:.1%}", f"{metrics['overall_coverage']-0.95:+.1%} vs target", help="The % of time actual demand fell within the predicted range across all products.")
+    gcol2.metric("Volatile Coverage", f"{metrics['volatile_coverage']:.1%}", f"{metrics['volatile_coverage']-0.95:+.1%} vs target", help="Coverage calculated only for items with highly variable demand.")
+    gcol3.metric("High Risk Items", f"{100*np.mean(results_df['risk_tier']=='High'):.1f}%", delta="Need attention", help="% of catalog with highly uncertain forecasts requiring review.")
+    gcol4.metric("Mean Interval Width", f"{metrics['mean_width']:.1f} units", help="Average gap between lower and upper bounds. Lower means more precision.")
+
+st.write("")
+st.subheader("🚦 Risk Tier Distribution")
 st.caption("Portfolio-wide summary across the whole catalog. By design this does NOT change "
            "when you switch a single product.")
+
 col1, col2 = st.columns(2)
 with col1:
-    tier_counts_df = results_df.groupby('risk_tier').size().reset_index(name='count')
-    fig_pie = px.pie(tier_counts_df, values='count', names='risk_tier', color='risk_tier',
-                     color_discrete_map={'Low': '#2ecc71', 'Medium': '#f39c12', 'High': '#e74c3c'},
-                     title='Risk Tier Distribution')
-    st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+    with st.container(border=True):
+        tier_counts_df = results_df.groupby('risk_tier').size().reset_index(name='count')
+        fig_pie = px.pie(tier_counts_df, values='count', names='risk_tier', color='risk_tier',
+                         color_discrete_map={'Low': '#2ecc71', 'Medium': '#f39c12', 'High': '#e74c3c'},
+                         title='Risk Tier Distribution')
+        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 with col2:
-    tier_stats = results_df.groupby('risk_tier').agg(
-        stockout_rate=('covered', lambda x: 1 - x.mean())).reset_index()
-    fig_bar = px.bar(tier_stats, x='risk_tier', y='stockout_rate', color='risk_tier',
-                     color_discrete_map={'Low': '#2ecc71', 'Medium': '#f39c12', 'High': '#e74c3c'},
-                     title='Stockout Rate by Tier (Validation)')
-    st.plotly_chart(fig_bar, use_container_width=True, config=PLOTLY_CONFIG)
+    with st.container(border=True):
+        tier_stats = results_df.groupby('risk_tier').agg(
+            stockout_rate=('covered', lambda x: 1 - x.mean())).reset_index()
+        fig_bar = px.bar(tier_stats, x='risk_tier', y='stockout_rate', color='risk_tier',
+                         color_discrete_map={'Low': '#2ecc71', 'Medium': '#f39c12', 'High': '#e74c3c'},
+                         title='Stockout Rate by Tier (Validation)')
+        st.plotly_chart(fig_bar, use_container_width=True, config=PLOTLY_CONFIG)
 st.divider()
 
 # ---------------- Calibration evidence (whole-system, constant) ----------------
@@ -178,20 +201,22 @@ st.subheader("📊 Calibration Evidence — Whole System")
 st.caption("System-level proof that our uncertainty is honest. Also constant across products by design.")
 col1, col2 = st.columns(2)
 with col1:
-    fig_cov = go.Figure()
-    fig_cov.add_trace(go.Bar(x=['Overall', 'Calm', 'Volatile'],
-                             y=[metrics['overall_coverage'], metrics['calm_coverage'], metrics['volatile_coverage']],
-                             marker_color=['steelblue', 'forestgreen', 'firebrick']))
-    fig_cov.add_hline(y=0.95, line_dash="dash", line_color="black", annotation_text="Target 95%")
-    fig_cov.update_layout(yaxis_range=[0.7, 1.0], height=350, title='Coverage by Regime')
-    st.plotly_chart(fig_cov, use_container_width=True, config=PLOTLY_CONFIG)
+    with st.container(border=True):
+        fig_cov = go.Figure()
+        fig_cov.add_trace(go.Bar(x=['Overall', 'Calm', 'Volatile'],
+                                 y=[metrics['overall_coverage'], metrics['calm_coverage'], metrics['volatile_coverage']],
+                                 marker_color=['steelblue', 'forestgreen', 'firebrick']))
+        fig_cov.add_hline(y=0.95, line_dash="dash", line_color="black", annotation_text="Target 95%")
+        fig_cov.update_layout(yaxis_range=[0.7, 1.0], height=350, title='Coverage by Regime')
+        st.plotly_chart(fig_cov, use_container_width=True, config=PLOTLY_CONFIG)
 with col2:
-    aci_diag = pd.DataFrame({'Step': range(len(aci.coverage_history)),
-                             'Running Coverage': pd.Series(aci.coverage_history).expanding().mean()})
-    fig_aci = px.line(aci_diag, x='Step', y='Running Coverage', title='ACI Self-Correction Over Time')
-    fig_aci.add_hline(y=0.95, line_dash="dash", line_color="red", annotation_text="Target")
-    fig_aci.update_layout(height=350)
-    st.plotly_chart(fig_aci, use_container_width=True, config=PLOTLY_CONFIG)
+    with st.container(border=True):
+        aci_diag = pd.DataFrame({'Step': range(len(aci.coverage_history)),
+                                 'Running Coverage': pd.Series(aci.coverage_history).expanding().mean()})
+        fig_aci = px.line(aci_diag, x='Step', y='Running Coverage', title='ACI Self-Correction Over Time')
+        fig_aci.add_hline(y=0.95, line_dash="dash", line_color="red", annotation_text="Target")
+        fig_aci.update_layout(height=350)
+        st.plotly_chart(fig_aci, use_container_width=True, config=PLOTLY_CONFIG)
 
 st.divider()
 st.markdown("**Kizuna RiskTriage** | Team Kizuna | AI for Public Good Hackathon 2026")
