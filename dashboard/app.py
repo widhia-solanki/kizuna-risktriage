@@ -82,6 +82,40 @@ with st.spinner("Loading data and training models..."):
     results_df, metrics, aci = load_and_process_data()
 
 st.title("🎯 Kizuna RiskTriage")
+st.markdown("""
+<style>
+/* Smooth slide-up fade-in for the main content */
+.block-container {
+    animation: fadeIn 0.8s ease-out;
+}
+@keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+
+/* Hover motion for border containers and charts */
+div[data-testid="stVerticalBlockBorderWrapper"], div[data-testid="stPlotlyChart"] {
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover, div[data-testid="stPlotlyChart"]:hover {
+    transform: translateY(-8px) !important;
+    box-shadow: 0 10px 25px rgba(255,255,255,0.05) !important;
+}
+/* Scroll-triggered motion for ALL components */
+@supports (animation-timeline: view()) {
+    .element-container, div[data-testid="stVerticalBlockBorderWrapper"] {
+        animation: revealOnScroll linear both;
+        animation-timeline: view();
+        animation-range: entry 2% cover 20%;
+    }
+}
+@keyframes revealOnScroll {
+    0% { opacity: 0; transform: translateY(30px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+</style>
+""", unsafe_allow_html=True)
 st.markdown("### Calibrated Uncertainty Quantification for Supply Chain Risk Triage")
 st.caption("Making demand forecasts honest about what they don't know — and actionable for managers.")
 st.divider()
