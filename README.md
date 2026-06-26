@@ -80,5 +80,5 @@ streamlit run dashboard/app.py
 - Inventory simulation: calibrated system hits service target at lower cost
 
 ## Team
-- Member 1 — Mechanical Engineering
-- Member 2 — ECE
+- Member 1 — Widhia Solanki (Mechanical Engineering)
+- Member 2 — Dhruvil Meshri (Electronics and Communication Engineering)
