@@ -70,19 +70,22 @@ with st.spinner("Loading data and training models..."):
 
 st.title("🎯 Kizuna RiskTriage")
 st.markdown("### Calibrated Uncertainty Quantification for Supply Chain Risk Triage")
+st.markdown("*Making demand forecasts honest about what they don't know — and actionable for managers.*")
 st.divider()
 
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Overall Coverage", f"{metrics['overall_coverage']:.1%}")
+    cov_delta = metrics['overall_coverage'] - 0.95
+    st.metric("Overall Coverage", f"{metrics['overall_coverage']:.1%}", delta=f"{cov_delta * 100:.1f}% from target", help="The % of time actual demand fell within the predicted range.")
 with col2:
-    st.metric("Volatile Coverage", f"{metrics['volatile_coverage']:.1%}")
+    vol_delta = metrics['volatile_coverage'] - 0.95
+    st.metric("Volatile Coverage", f"{metrics['volatile_coverage']:.1%}", delta=f"{vol_delta * 100:.1f}% from target", help="Coverage calculated only for items with highly variable demand.")
 with col3:
     high_pct = 100 * np.mean(results_df['risk_tier'] == 'High')
-    st.metric("High Risk Items", f"{high_pct:.1f}%")
+    st.metric("High Risk Items", f"{high_pct:.1f}%", delta="Need attention", help="% of catalog with highly uncertain forecasts requiring review.")
 with col4:
-    st.metric("Mean Interval Width", f"{metrics['mean_width']:.1f} units")
+    st.metric("Mean Interval Width", f"{metrics['mean_width']:.1f} units", help="Average gap between lower and upper bounds. Lower means more precision.")
 st.divider()
 
 st.sidebar.header("Controls")
@@ -94,8 +97,8 @@ st.sidebar.markdown("🟢 **Low**: Auto-replenish")
 st.sidebar.markdown("🟡 **Medium**: Raise safety stock")
 st.sidebar.markdown("🔴 **High**: Human review")
 
-st.subheader(f"📈 Demand Forecast: {selected_item}")
 item_data = results_df[results_df['item_id'] == selected_item].tail(show_days).reset_index(drop=True)
+st.subheader(f"📈 Demand Forecast: {selected_item} — last {len(item_data)} days")
 if len(item_data) > 0:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=item_data.index, y=item_data['upper_bound'], mode='lines', line=dict(width=0), showlegend=False))
@@ -110,8 +113,7 @@ if len(item_data) > 0:
         fig.add_trace(go.Scatter(x=item_data.index[high_mask], y=item_data['sales'][high_mask], mode='markers',
                                  name='High Risk Day', marker=dict(color='red', size=10, symbol='diamond')))
     fig.update_layout(height=400, xaxis_title='Day', yaxis_title='Demand (units)',
-                      legend=dict(orientation='h', yanchor='bottom', y=1.02), margin=dict(t=30),
-                      title=f"{selected_item} — last {len(item_data)} days")
+                      legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0), margin=dict(t=40))
     st.plotly_chart(fig, use_container_width=True, key=f"forecast_{selected_item}_{show_days}")
     latest = item_data.iloc[-1]
     tier_color = {'Low': '🟢', 'Medium': '🟡', 'High': '🔴'}
