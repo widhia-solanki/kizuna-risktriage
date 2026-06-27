@@ -84,6 +84,20 @@ with st.spinner("Loading data and training models..."):
 st.title("🎯 Kizuna RiskTriage")
 st.markdown("""
 <style>
+/* Fixed dynamic background (Clean Architectural Grid) */
+[data-testid="stAppViewContainer"] {
+    background-color: transparent !important;
+    background-image: 
+        radial-gradient(circle at 50% 0%, rgba(128, 128, 128, 0.05) 0%, transparent 70%),
+        linear-gradient(rgba(128, 128, 128, 0.12) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(128, 128, 128, 0.12) 1px, transparent 1px) !important;
+    background-size: 100% 100%, 60px 60px, 60px 60px !important;
+    background-attachment: fixed !important;
+}
+[data-testid="stHeader"] {
+    background: transparent !important;
+}
+
 /* Smooth slide-up fade-in for the main content */
 .block-container {
     animation: fadeIn 0.8s ease-out;
@@ -114,25 +128,51 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover, div[data-testid="stPlotly
     0% { opacity: 0; transform: translateY(30px); }
     100% { opacity: 1; transform: translateY(0); }
 }
+
+/* Ensure the sidebar toggle button never scrolls out of view, and stays on the right */
+[data-testid="stSidebarCollapseButton"] {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 99999 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 st.markdown("### Calibrated Uncertainty Quantification for Supply Chain Risk Triage")
 st.caption("Making demand forecasts honest about what they don't know — and actionable for managers.")
 st.divider()
 # ---------------- Sidebar ----------------
-st.sidebar.header("Controls")
+st.sidebar.markdown("<h2 style='font-size: 1.4rem; font-weight: 700; margin-bottom: 1rem;'>⚙️ Controls</h2>", unsafe_allow_html=True)
+
 selected_item = st.sidebar.selectbox("Select Product", sorted(results_df['item_id'].unique()))
 show_days = st.sidebar.slider("Days to display", 14, 120, 60)
+st.sidebar.write("") # Spacer
+
 show_raw_qr = st.sidebar.checkbox(
     "Show Raw QR (uncalibrated) band", value=False,
     help="Overlays the ORIGINAL uncalibrated quantile-regression band (red, dotted) on top of "
          "our calibrated band (blue). Use it to SEE how the raw model's interval is too narrow "
          "and under-covers — that is the problem our calibration fixes.")
+
+st.sidebar.write("")
 st.sidebar.divider()
-st.sidebar.markdown("### Risk Tier Actions")
-st.sidebar.markdown("🟢 **Low** → Auto-replenish")
-st.sidebar.markdown("🟡 **Medium** → Raise safety stock")
-st.sidebar.markdown("🔴 **High** → Human review")
+
+st.sidebar.markdown(f"""
+<div style="font-size: 0.8rem; font-weight: 700; color: #888; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1.5px;">
+    Risk Tier Actions
+</div>
+<div style="background-color: rgba(46, 204, 113, 0.1); border-left: 3px solid #2ecc71; padding: 10px 14px; border-radius: 4px; margin-bottom: 10px;">
+    <div style="color: #2ecc71; font-weight: bold; margin-bottom: 2px;">✨ Low Risk</div>
+    <div style="font-size: 0.85rem; opacity: 0.9; line-height: 1.3;">Auto-replenish nominal stock.</div>
+</div>
+<div style="background-color: rgba(243, 156, 18, 0.1); border-left: 3px solid #f39c12; padding: 10px 14px; border-radius: 4px; margin-bottom: 10px;">
+    <div style="color: #f39c12; font-weight: bold; margin-bottom: 2px;">⚠️ Medium Risk</div>
+    <div style="font-size: 0.85rem; opacity: 0.9; line-height: 1.3;">Raise safety stock to calibrated quantile.</div>
+</div>
+<div style="background-color: rgba(231, 76, 60, 0.1); border-left: 3px solid #e74c3c; padding: 10px 14px; border-radius: 4px;">
+    <div style="color: #e74c3c; font-weight: bold; margin-bottom: 2px;">🚨 High Risk</div>
+    <div style="font-size: 0.85rem; opacity: 0.9; line-height: 1.3;">Escalate for immediate human review.</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------- Product-Specific Metrics (Top of Page) ----------------
 item_all = results_df[results_df['item_id'] == selected_item]
@@ -185,13 +225,42 @@ if len(item_data) > 0:
     
     tier_icon = {'Low': '🟢', 'Medium': '🟡', 'High': '🔴'}[tier]
     with st.container(border=True):
-        c1, c2, c3 = st.columns([1, 1, 1.5])
+        c1, c2, c3 = st.columns([1, 1, 2.5])
         c1.metric("Latest Risk Tier", f"{tier_icon} {tier}")
         c2.metric("Point Forecast", f"{latest['point_forecast']:.0f}", f"{latest['lower_bound']:.0f} to {latest['upper_bound']:.0f} units", delta_color="off")
+        
         with c3:
-            if tier == 'Low': st.success(f"**Action:** {action}")
-            elif tier == 'Medium': st.warning(f"**Action:** {action}")
-            else: st.error(f"**Action:** {action}")
+            if tier == 'Low':
+                color = "#2ecc71"
+                icon = "✨"
+            elif tier == 'Medium':
+                color = "#f39c12"
+                icon = "⚠️"
+            else:
+                color = "#e74c3c"
+                icon = "🚨"
+                
+            st.markdown(f"""
+            <div style="
+                border: 1px solid {color}30;
+                border-left: 4px solid {color};
+                background: linear-gradient(90deg, {color}15 0%, transparent 100%);
+                border-radius: 6px;
+                padding: 10px 16px;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                min-height: 85px;
+                margin-top: 5px;
+            ">
+                <div style="font-size: 0.85rem; color: {color}; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-weight: 700;">
+                    {icon} Recommended Action
+                </div>
+                <div style="font-size: 1.05rem; font-weight: 500; line-height: 1.3;">
+                    {action}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 st.divider()
