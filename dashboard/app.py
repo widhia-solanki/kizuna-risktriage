@@ -322,4 +322,4 @@ with col2:
         st.plotly_chart(fig_aci, use_container_width=True, config=PLOTLY_CONFIG)
 
 st.divider()
-st.markdown("**Kizuna RiskTriage** | Team Kizuna | AI for Public Good Hackathon 2026")
+st.markdown("**Kizuna RiskTriage** | Team Kizuna | Widhia Solanki | Dhruvil Meshri | AI for Public Good Hackathon 2026")
